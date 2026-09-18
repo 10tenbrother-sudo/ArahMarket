@@ -1,0 +1,6 @@
+{
+  "name": "Market Intelligence Platform",
+  "description": "Real-time market intelligence platform for traders with multi-source news ingestion, cross-language event deduplication, asset relationship mapping, and live market context.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
