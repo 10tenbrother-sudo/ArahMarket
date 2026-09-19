@@ -252,6 +252,7 @@ export interface User {
   name: string;
   role: 'USER' | 'ADMIN';
   is_verified: boolean;
+  verification_status?: 'pending_verification' | 'verified';
   avatar_url?: string;
   plan?: SubscriptionPlan;
   subscription_status?: 'active' | 'trialing' | 'canceled' | 'none';

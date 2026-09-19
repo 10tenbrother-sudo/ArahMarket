@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { db } from '../db/database.js';
 import { requireAuth, AuthenticatedRequest } from '../auth/authService.js';
+import { EntitlementService } from '../auth/entitlementService.js';
 import { UserWatchlist } from '../types.js';
 
 export const userRouter = Router();
@@ -24,11 +25,25 @@ userRouter.get('/watchlist', requireAuth, (req: AuthenticatedRequest, res: Respo
 });
 
 // POST add to watchlist
-userRouter.post('/watchlist', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user!.id;
+userRouter.post('/watchlist', requireAuth as any, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const userId = user.id;
   const { symbol, asset_type, notes } = req.body;
   if (!symbol) {
     res.status(400).json({ error: 'Symbol is required.' });
+    return;
+  }
+
+  // Server-side usage limit check
+  const limits = EntitlementService.getUserLimits(user);
+  const currentList = db.getUserWatchlist(userId);
+  if (currentList.length >= limits.watchlistLimit) {
+    res.status(403).json({
+      error: `Watchlist limit reached: Your ${user.plan || 'FREE'} plan allows a maximum of ${limits.watchlistLimit} symbols. Upgrade to expand your watchlist capacity.`,
+      code: 'WATCHLIST_LIMIT_REACHED',
+      limit: limits.watchlistLimit,
+      current_count: currentList.length,
+    });
     return;
   }
 
@@ -94,4 +109,71 @@ userRouter.post('/subscription', requireAuth, (req: AuthenticatedRequest, res: R
     },
   });
 });
+
+// GET current user entitlements & usage limits
+userRouter.get('/entitlements', requireAuth as any, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const limits = EntitlementService.getUserLimits(user);
+  const aiUsage = EntitlementService.getAIUsage(user.id, user);
+  const watchlist = db.getUserWatchlist(user.id);
+
+  res.json({
+    plan: user.plan || 'FREE',
+    role: user.role,
+    subscription_status: user.subscription_status || 'active',
+    subscription_expires_at: user.subscription_expires_at,
+    limits: {
+      ...limits,
+      currentWatchlistCount: watchlist.length,
+      aiUsedToday: aiUsage.used,
+      aiRemainingToday: aiUsage.remaining,
+    },
+    permissions: {
+      market_radar: EntitlementService.canAccessFeature(user, 'MARKET_RADAR'),
+      currency_strength_matrix: EntitlementService.canAccessFeature(user, 'CURRENCY_STRENGTH_MATRIX'),
+      macro_news_wire: EntitlementService.canAccessFeature(user, 'MACRO_NEWS_WIRE'),
+      economic_calendar: EntitlementService.canAccessFeature(user, 'ECONOMIC_CALENDAR'),
+      tradingview_charts: EntitlementService.canAccessFeature(user, 'TRADINGVIEW_CHARTS'),
+      ai_overview_refresh: EntitlementService.canAccessFeature(user, 'AI_OVERVIEW_REFRESH'),
+      ai_deep_analysis: EntitlementService.canAccessFeature(user, 'AI_DEEP_ANALYSIS'),
+      sse_priority_stream: EntitlementService.canAccessFeature(user, 'SSE_PRIORITY_STREAM'),
+      persistent_watchlist: EntitlementService.canAccessFeature(user, 'PERSISTENT_WATCHLIST'),
+      custom_telegram_scraper: EntitlementService.canAccessFeature(user, 'CUSTOM_TELEGRAM_SCRAPER'),
+      admin_system_panel: EntitlementService.canAccessFeature(user, 'ADMIN_SYSTEM_PANEL'),
+      api_data_export: EntitlementService.canAccessFeature(user, 'API_DATA_EXPORT'),
+    },
+  });
+});
+
+// POST initialize checkout session for future payment provider (e.g. Stripe, LemonSqueezy)
+userRouter.post('/checkout-session', requireAuth as any, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { plan, billing_cycle } = req.body;
+
+  if (!['PRO', 'INSTITUTIONAL'].includes(plan)) {
+    res.status(400).json({ error: 'Checkout is only available for paid plans (PRO or INSTITUTIONAL).' });
+    return;
+  }
+
+  // Prepared integration architecture for payment gateway
+  const sessionId = `chk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const prices: Record<string, { monthly: number; annual: number }> = {
+    PRO: { monthly: 49, annual: 39 * 12 },
+    INSTITUTIONAL: { monthly: 199, annual: 159 * 12 },
+  };
+
+  const amount = billing_cycle === 'annual' ? prices[plan].annual : prices[plan].monthly;
+
+  res.json({
+    session_id: sessionId,
+    plan,
+    billing_cycle: billing_cycle || 'annual',
+    currency: 'USD',
+    amount,
+    customer_email: user.email,
+    payment_provider_ready: false, // Clean marker indicating future payment provider gateway hook
+    message: 'Checkout session created. Ready for payment gateway connection.',
+  });
+});
+
 

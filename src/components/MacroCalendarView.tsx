@@ -24,9 +24,9 @@ interface MacroCalendarViewProps {
 }
 
 const TIMEZONES = [
+  { value: 'Asia/Jakarta', label: 'Jakarta / WIB (UTC+7)' },
   { value: 'UTC', label: 'UTC (Standard)' },
   { value: 'LOCAL', label: 'Local (Device Time)' },
-  { value: 'Asia/Jakarta', label: 'Jakarta / WIB (UTC+7)' },
   { value: 'America/New_York', label: 'New York (EDT/EST)' },
   { value: 'Europe/London', label: 'London (BST/GMT)' },
   { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
@@ -42,7 +42,7 @@ export const MacroCalendarView: React.FC<MacroCalendarViewProps> = ({
   const [timingFilter, setTimingFilter] = useState<'UPCOMING' | 'TODAY' | 'RELEASED' | 'ALL'>('UPCOMING');
   const [impactFilter, setImpactFilter] = useState<string>('ALL');
   const [currencyFilter, setCurrencyFilter] = useState<string>('ALL');
-  const [selectedTimezone, setSelectedTimezone] = useState<string>('UTC');
+  const [selectedTimezone, setSelectedTimezone] = useState<string>('Asia/Jakarta');
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(Date.now());
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 

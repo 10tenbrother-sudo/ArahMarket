@@ -19,14 +19,16 @@ import {
 export const API_BASE = '/api';
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem('nexus_auth_token');
+  return localStorage.getItem('nexus_auth_token') || localStorage.getItem('auth_token');
 }
 
 export function setAuthToken(token: string | null): void {
   if (token) {
     localStorage.setItem('nexus_auth_token', token);
+    localStorage.setItem('auth_token', token);
   } else {
     localStorage.removeItem('nexus_auth_token');
+    localStorage.removeItem('auth_token');
   }
 }
 
@@ -45,7 +47,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (!res.ok) {
     const errorJson = await res.json().catch(() => ({}));
-    throw new Error(errorJson.error || `Request failed with status ${res.status}`);
+    const err: any = new Error(errorJson.error || errorJson.message || `Request failed with status ${res.status}`);
+    err.code = errorJson.code;
+    err.email = errorJson.email;
+    err.status = res.status;
+    throw err;
   }
 
   return res.json();
@@ -100,9 +106,33 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(credentials),
   }),
-  register: (payload: { email: string; password: string; name: string }) => request<{ user: User; token: string }>('/auth/register', {
+  register: (payload: { email: string; password: string; name: string }) => request<{
+    success: boolean;
+    status: 'pending_verification';
+    message: string;
+    email: string;
+    verificationUrl?: string;
+    user: User;
+  }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload),
+  }),
+  verifyEmail: (token: string) => request<{
+    success: boolean;
+    message: string;
+    token: string;
+    user: User;
+  }>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  }),
+  resendVerification: (email: string) => request<{
+    success: boolean;
+    message: string;
+    verificationUrl?: string;
+  }>('/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
   }),
   getWatchlist: () => request<{ watchlist: UserWatchlist[] }>('/user/watchlist'),
   addToWatchlist: (symbol: string, asset_type: string) => request<{ success: boolean; item: UserWatchlist }>('/user/watchlist', {
@@ -116,9 +146,79 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ plan }),
   }),
+  getUserEntitlements: () => request<any>('/user/entitlements'),
+  createCheckoutSession: (payload: { plan: string; billing_cycle: 'monthly' | 'annual' }) => request<any>('/user/checkout-session', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  getPaymentConfig: () => request<{
+    isConfigured: boolean;
+    clientKey: string;
+    isProduction: boolean;
+    currency: string;
+    pricing: Record<string, { monthly: number; annual: number }>;
+    manualBank: {
+      bank: string;
+      billerCode: string;
+      companyName: string;
+      accountNumber: string;
+      accountName: string;
+      qrisMerchantName: string;
+    };
+  }>('/payments/config'),
+  createPaymentCharge: (payload: { plan: string; billing_cycle: 'monthly' | 'annual' }) => request<{
+    success: boolean;
+    orderId: string;
+    token: string;
+    redirectUrl: string | null;
+    grossAmount: number;
+    currency: string;
+    plan: string;
+    billingCycle: string;
+    isSimulated: boolean;
+    demoDetails?: {
+      mandiriBillerCode: string;
+      mandiriBillKey: string;
+      companyName: string;
+      qrisString: string;
+    };
+  }>('/payments/charge', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  simulatePaymentSuccess: (payload: { orderId: string; plan: string; billing_cycle: string }) => request<{
+    success: boolean;
+    message: string;
+    user: User;
+  }>('/payments/simulate-success', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  submitManualPayment: (payload: {
+    plan: string;
+    senderName: string;
+    senderBank: string;
+    transferAmount: number;
+    referenceNote?: string;
+  }) => request<{
+    success: boolean;
+    message: string;
+  }>('/payments/manual-confirm', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  requestPasswordReset: (email: string) => request<{ message: string }>('/auth/password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
 
   // Admin
   getSystemHealth: () => request<any>('/admin/system-health'),
+  getAdminUsers: () => request<{ users: User[]; count: number }>('/admin/users'),
+  updateAdminUser: (id: string, updates: { role?: string; plan?: string; subscription_status?: string }) => request<{ success: boolean; user: User }>(`/admin/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  }),
   getSources: () => request<{ sources: any[]; count: number }>('/admin/sources'),
   toggleSource: (id: string, is_enabled: boolean) => request<any>(`/admin/sources/${id}`, {
     method: 'PATCH',

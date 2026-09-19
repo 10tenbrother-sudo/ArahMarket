@@ -13,12 +13,26 @@ export interface User {
   name: string;
   role: UserRole;
   is_verified: boolean;
+  verification_status?: 'pending_verification' | 'verified';
   avatar_url?: string;
   plan?: SubscriptionPlan;
-  subscription_status?: 'active' | 'trialing' | 'canceled' | 'none';
+  subscription_status?: 'active' | 'trialing' | 'canceled' | 'none' | 'pending';
   subscription_expires_at?: string;
+  last_order_id?: string;
+  payment_method?: string;
+  billing_cycle?: 'monthly' | 'annual';
   created_at: string;
   updated_at: string;
+}
+
+export interface VerificationToken {
+  id: string;
+  user_id: string;
+  email: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+  used_at?: string;
 }
 
 export interface UserPreferences {

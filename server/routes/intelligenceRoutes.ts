@@ -3,6 +3,8 @@ import { db } from '../db/database.js';
 import { generateMacroMarketOverview } from '../intelligence/gemini.js';
 import { MacroIntelligenceEngine } from '../intelligence/macroIntelligence.js';
 import { IntradayMarketMapEngine } from '../intelligence/intradayMarketMap.js';
+import { requireAuth, AuthenticatedRequest } from '../auth/authService.js';
+import { EntitlementService } from '../auth/entitlementService.js';
 
 export const intelligenceRouter = Router();
 
@@ -146,13 +148,43 @@ intelligenceRouter.get('/ai', async (req, res) => {
   });
 });
 
-// POST refresh AI market overview
-intelligenceRouter.post('/ai/refresh', async (req, res) => {
+// POST refresh AI market overview (Requires authentication, AI_OVERVIEW_REFRESH permission, and usage check)
+intelligenceRouter.post('/ai/refresh', requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  
+  // Check permission
+  if (!EntitlementService.canAccessFeature(user, 'AI_OVERVIEW_REFRESH')) {
+    res.status(403).json({
+      error: 'Upgrade Required: AI Market Overview refresh is available on PRO and INSTITUTIONAL tiers.',
+      code: 'PLAN_UPGRADE_REQUIRED',
+      required_permission: 'AI_OVERVIEW_REFRESH',
+      current_plan: user.plan || 'FREE',
+    });
+    return;
+  }
+
+  // Check and increment usage limits
+  const usageCheck = EntitlementService.checkAndIncrementAIUsage(user.id, user);
+  if (!usageCheck.allowed) {
+    res.status(429).json({
+      error: `Daily limit reached: Your ${user.plan || 'FREE'} plan allows ${usageCheck.limit} AI generations per day.`,
+      code: 'USAGE_LIMIT_REACHED',
+      limit: usageCheck.limit,
+      used: usageCheck.used,
+    });
+    return;
+  }
+
   try {
     const freshOverview = await generateMacroMarketOverview();
     res.json({
       success: true,
       market_overview: freshOverview,
+      usage: {
+        used: usageCheck.used,
+        limit: usageCheck.limit,
+        remaining: usageCheck.remaining,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {

@@ -8,8 +8,26 @@ import crypto from 'node:crypto';
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/database.js';
 import { User, UserRole, UserPreferences } from '../types.js';
+import { mailService, EmailSendResult } from '../services/mailService.js';
 
-const JWT_SECRET = process.env.APP_SECRET || 'market-intelligence-terminal-secret-key-prod-9988';
+const PBKDF2_ITERATIONS = 210_000;
+const PBKDF2_KEYLEN = 64;
+const PBKDF2_DIGEST = 'sha512';
+
+function resolveSecret(): string {
+  const fromEnv = process.env.APP_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      '[FATAL] APP_SECRET tidak diset (atau kurang dari 32 karakter). ' +
+      'Set di environment variable sebelum menjalankan production.'
+    );
+  }
+  console.warn('[Auth] APP_SECRET belum diset — memakai secret sementara khusus development.');
+  return 'dev-only-insecure-secret-do-not-use-in-production';
+}
+
+const JWT_SECRET = resolveSecret();
 
 export interface AuthTokenPayload {
   userId: string;
@@ -23,21 +41,26 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export class AuthService {
-  /**
-   * Hashes password using PBKDF2 with unique salt
-   */
   public static hashPassword(password: string, salt?: string): { hash: string; salt: string } {
     const s = salt || crypto.randomBytes(16).toString('hex');
-    const hash = crypto.pbkdf2Sync(password, s, 1000, 64, 'sha512').toString('hex');
+    const hash = crypto
+      .pbkdf2Sync(password, s, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST)
+      .toString('hex');
     return { hash, salt: s };
   }
 
-  /**
-   * Verifies password against stored hash and salt
-   */
   public static verifyPassword(password: string, hash: string, salt: string): boolean {
-    const derived = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-    return crypto.timingSafeEqual(Buffer.from(derived, 'utf-8'), Buffer.from(hash, 'utf-8'));
+    if (!password || !hash || !salt) return false;
+    try {
+      const derived = crypto.pbkdf2Sync(
+        password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST
+      );
+      const stored = Buffer.from(hash, 'hex');
+      if (derived.length !== stored.length) return false;
+      return crypto.timingSafeEqual(derived, stored);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -88,11 +111,29 @@ export class AuthService {
   }
 
   /**
-   * Registers a new user with default preferences
+   * Registers a new user in 'pending_verification' status and dispatches verification link
    */
-  public static register(email: string, password: string, name: string): { user: User; token: string } {
-    const existing = db.getUserByEmail(email);
+  public static async register(
+    email: string,
+    password: string,
+    name: string,
+    baseUrl: string
+  ): Promise<{
+    user: User;
+    status: 'pending_verification';
+    message: string;
+    mailResult: EmailSendResult;
+    verificationUrl?: string;
+  }> {
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = db.getUserByEmail(cleanEmail);
     if (existing) {
+      if (!existing.is_verified || existing.verification_status === 'pending_verification') {
+        const err: any = new Error('ALREADY_REGISTERED_UNVERIFIED: Email ini sudah terdaftar tetapi belum diverifikasi. Silakan periksa inbox Anda atau minta kirim ulang tautan.');
+        err.code = 'ALREADY_REGISTERED_UNVERIFIED';
+        err.email = existing.email;
+        throw err;
+      }
       throw new Error('User already exists with this email address.');
     }
 
@@ -105,12 +146,13 @@ export class AuthService {
 
     const newUser: User = {
       id: userId,
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       password_hash: hash,
       salt,
       name: name.trim() || 'Trader',
       role: 'USER',
-      is_verified: true, // Auto-verified for seamless UX
+      is_verified: false,
+      verification_status: 'pending_verification',
       plan: 'FREE',
       subscription_status: 'active',
       created_at: new Date().toISOString(),
@@ -132,15 +174,32 @@ export class AuthService {
     };
     db.upsertUserPreferences(defaultPrefs);
 
-    const token = this.generateToken(newUser);
-    return { user: newUser, token };
+    // Create temporary verification token in database (valid 24h)
+    const tokenRecord = db.createVerificationToken(userId, cleanEmail, 24);
+
+    // Send verification email via node-mailer service
+    const mailResult = await mailService.sendVerificationEmail(
+      cleanEmail,
+      newUser.name,
+      tokenRecord.token,
+      baseUrl
+    );
+
+    return {
+      user: newUser,
+      status: 'pending_verification',
+      message: 'Registrasi berhasil. Tautan aktivasi akun telah dikirim ke email Anda.',
+      mailResult,
+      verificationUrl: mailResult.devMode ? mailResult.verificationUrl : undefined,
+    };
   }
 
   /**
-   * Authenticates user credentials
+   * Authenticates user credentials with verification check
    */
   public static login(email: string, password: string): { user: User; token: string } {
-    const user = db.getUserByEmail(email);
+    const cleanEmail = email.toLowerCase().trim();
+    const user = db.getUserByEmail(cleanEmail);
     if (!user) {
       throw new Error('Invalid email or password.');
     }
@@ -150,8 +209,66 @@ export class AuthService {
       throw new Error('Invalid email or password.');
     }
 
+    // Enforce email verification
+    if (!user.is_verified || user.verification_status === 'pending_verification') {
+      const err: any = new Error('EMAIL_NOT_VERIFIED: Akun Anda belum diverifikasi. Silakan periksa inbox email Anda untuk mengklik tautan aktivasi.');
+      err.code = 'EMAIL_NOT_VERIFIED';
+      err.email = user.email;
+      throw err;
+    }
+
     const token = this.generateToken(user);
     return { user, token };
+  }
+
+  /**
+   * Verifies an email token from verification_tokens table and activates user
+   */
+  public static verifyEmail(token: string): { success: boolean; user?: User; token?: string; error?: string } {
+    const res = db.consumeVerificationToken(token);
+    if (!res.success || !res.user) {
+      return { success: false, error: res.error || 'Token verifikasi tidak valid atau telah kedaluwarsa.' };
+    }
+
+    const sessionToken = this.generateToken(res.user);
+    return {
+      success: true,
+      user: res.user,
+      token: sessionToken,
+    };
+  }
+
+  /**
+   * Resends verification email for unverified user
+   */
+  public static async resendVerification(
+    email: string,
+    baseUrl: string
+  ): Promise<{ success: boolean; message: string; mailResult: EmailSendResult; verificationUrl?: string }> {
+    const cleanEmail = email.toLowerCase().trim();
+    const user = db.getUserByEmail(cleanEmail);
+    if (!user) {
+      throw new Error('Akun dengan alamat email ini tidak ditemukan.');
+    }
+
+    if (user.is_verified && user.verification_status !== 'pending_verification') {
+      throw new Error('Akun Anda sudah terverifikasi sebelumnya. Silakan langsung masuk ke terminal.');
+    }
+
+    const tokenRecord = db.createVerificationToken(user.id, user.email, 24);
+    const mailResult = await mailService.sendVerificationEmail(
+      user.email,
+      user.name,
+      tokenRecord.token,
+      baseUrl
+    );
+
+    return {
+      success: true,
+      message: 'Tautan verifikasi baru telah dikirimkan ke email Anda.',
+      mailResult,
+      verificationUrl: mailResult.devMode ? mailResult.verificationUrl : undefined,
+    };
   }
 }
 
@@ -177,6 +294,15 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   const user = db.getUserById(payload.userId);
   if (!user) {
     res.status(401).json({ error: 'Unauthorized: User not found' });
+    return;
+  }
+
+  if (!user.is_verified || user.verification_status === 'pending_verification') {
+    res.status(403).json({
+      error: 'EMAIL_NOT_VERIFIED',
+      message: 'Akun Anda belum diverifikasi via email. Silakan periksa inbox Anda.',
+      email: user.email,
+    });
     return;
   }
 

@@ -16,6 +16,7 @@ import { intelligenceRouter } from './server/routes/intelligenceRoutes.js';
 import { userRouter } from './server/routes/userRoutes.js';
 import { adminRouter } from './server/routes/adminRoutes.js';
 import { streamRouter } from './server/routes/streamRoutes.js';
+import { paymentRouter } from './server/routes/paymentRoutes.js';
 
 import { MarketDataService } from './server/ingestion/marketData.js';
 import { TelegramIngestionService } from './server/ingestion/telegram.js';
@@ -55,6 +56,7 @@ async function startServer() {
   app.use('/api/user', userRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/stream', streamRouter);
+  app.use('/api/payments', paymentRouter);
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {

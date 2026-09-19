@@ -26,13 +26,15 @@ import {
   UnifiedMarketContext,
   CentralBankTone,
   MacroConditionStatus,
+  User,
 } from '../types';
 
 interface AIIntelligenceViewProps {
   initialOverview?: AIAnalysis | null;
+  user?: User | null;
 }
 
-export const AIIntelligenceView: React.FC<AIIntelligenceViewProps> = ({ initialOverview }) => {
+export const AIIntelligenceView: React.FC<AIIntelligenceViewProps> = ({ initialOverview, user }) => {
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'CENTRAL_BANK' | 'MACRO_CONTEXT' | 'UNIFIED_CONTEXT'>('OVERVIEW');
   const [overview, setOverview] = useState<AIAnalysis | null>(initialOverview || null);
   const [themes, setThemes] = useState<MarketTheme[]>([]);
@@ -184,18 +186,23 @@ export const AIIntelligenceView: React.FC<AIIntelligenceViewProps> = ({ initialO
       </div>
 
       {notification && (
-        <div className={`px-3 py-2 rounded-lg border text-xs font-mono flex items-center justify-between ${
+        <div className={`px-3.5 py-2.5 rounded-lg border text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
           notification.type === 'error'
             ? 'bg-rose-950/50 border-rose-800/60 text-rose-300'
             : 'bg-emerald-950/50 border-emerald-800/60 text-emerald-300'
         }`}>
-          <span>{notification.message}</span>
-          <button
-            onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer ml-2"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{notification.message}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setNotification(null)}
+              className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer ml-2"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 

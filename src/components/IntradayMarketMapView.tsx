@@ -288,7 +288,15 @@ export const IntradayMarketMapView: React.FC<IntradayMarketMapViewProps> = ({
           </span>
         </div>
         <span className="text-[10px] text-slate-500 hidden sm:inline">
-          Last Synced: {new Date().toLocaleTimeString()} UTC
+          Last Synced:{' '}
+          {new Date().toLocaleTimeString('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })}{' '}
+          WIB
         </span>
       </div>
 
@@ -459,7 +467,16 @@ export const IntradayMarketMapView: React.FC<IntradayMarketMapViewProps> = ({
 
                     <div className="text-[10px] font-mono text-slate-500 flex items-center justify-between">
                       <span>Source: {asset.source}</span>
-                      <span>Updated: {new Date(asset.last_updated).toLocaleTimeString()} UTC</span>
+                      <span>
+                        Updated:{' '}
+                        {new Date(asset.last_updated).toLocaleTimeString('id-ID', {
+                          timeZone: 'Asia/Jakarta',
+                          hour12: false,
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}{' '}
+                        WIB
+                      </span>
                     </div>
                   </div>
                 )}

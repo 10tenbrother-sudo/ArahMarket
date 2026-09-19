@@ -6,8 +6,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {
   User,
+  VerificationToken,
   UserPreferences,
   UserWatchlist,
   UserAlert,
@@ -27,6 +29,7 @@ import { MacroEnricher } from '../intelligence/enrichment.js';
 
 interface DatabaseSchema {
   users: User[];
+  verification_tokens: VerificationToken[];
   user_preferences: UserPreferences[];
   user_watchlists: UserWatchlist[];
   user_alerts: UserAlert[];
@@ -55,6 +58,7 @@ export class RelationalDatabase {
   private indexes = {
     usersByEmail: new Map<string, User>(),
     usersById: new Map<string, User>(),
+    tokensByToken: new Map<string, VerificationToken>(),
     sourcesById: new Map<string, Source>(),
     telegramByHandle: new Map<string, TelegramChannel>(),
     newsById: new Map<string, NewsItem>(),
@@ -75,6 +79,7 @@ export class RelationalDatabase {
   private initializeEmptySchema(): DatabaseSchema {
     return {
       users: [],
+      verification_tokens: [],
       user_preferences: [],
       user_watchlists: [],
       user_alerts: [],
@@ -105,6 +110,9 @@ export class RelationalDatabase {
         const raw = fs.readFileSync(this.filePath, 'utf-8');
         const parsed = JSON.parse(raw);
         this.data = { ...this.initializeEmptySchema(), ...parsed };
+        if (!this.data.verification_tokens) {
+          this.data.verification_tokens = [];
+        }
       }
     } catch (err) {
       console.error('[DB] Error loading database file, initializing clean state:', err);
@@ -137,6 +145,7 @@ export class RelationalDatabase {
   public rebuildIndexes(): void {
     this.indexes.usersByEmail.clear();
     this.indexes.usersById.clear();
+    this.indexes.tokensByToken.clear();
     this.indexes.sourcesById.clear();
     this.indexes.telegramByHandle.clear();
     this.indexes.newsById.clear();
@@ -149,6 +158,10 @@ export class RelationalDatabase {
     for (const u of this.data.users) {
       this.indexes.usersByEmail.set(u.email.toLowerCase(), u);
       this.indexes.usersById.set(u.id, u);
+    }
+
+    for (const vt of (this.data.verification_tokens || [])) {
+      this.indexes.tokensByToken.set(vt.token, vt);
     }
 
     for (const s of this.data.sources) {
@@ -188,6 +201,10 @@ export class RelationalDatabase {
   }
 
   // ==================== USERS & PREFERENCES ====================
+  public getAllUsers(): User[] {
+    return [...this.data.users];
+  }
+
   public getUserByEmail(email: string): User | undefined {
     return this.indexes.usersByEmail.get(email.toLowerCase());
   }
@@ -211,6 +228,89 @@ export class RelationalDatabase {
     this.indexes.usersByEmail.set(user.email.toLowerCase(), user);
     this.scheduleSave();
     return user;
+  }
+
+  // ==================== EMAIL VERIFICATION TOKENS ====================
+  public createVerificationToken(userId: string, email: string, expiresInHours = 24): VerificationToken {
+    if (!this.data.verification_tokens) {
+      this.data.verification_tokens = [];
+    }
+
+    const now = new Date();
+    // Invalidate previous unconsumed tokens for this user
+    for (const vt of this.data.verification_tokens) {
+      if (vt.user_id === userId && !vt.used_at) {
+        vt.used_at = now.toISOString();
+      }
+    }
+
+    const tokenString = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000).toISOString();
+
+    const record: VerificationToken = {
+      id: `vtok_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+      user_id: userId,
+      email: email.toLowerCase().trim(),
+      token: tokenString,
+      expires_at: expiresAt,
+      created_at: now.toISOString(),
+    };
+
+    this.data.verification_tokens.push(record);
+    this.indexes.tokensByToken.set(tokenString, record);
+    this.scheduleSave();
+    return record;
+  }
+
+  public getVerificationToken(token: string): VerificationToken | undefined {
+    return this.indexes.tokensByToken.get(token);
+  }
+
+  public getLatestPendingVerificationToken(userId: string): VerificationToken | undefined {
+    const tokens = (this.data.verification_tokens || []).filter(
+      vt => vt.user_id === userId && !vt.used_at && new Date(vt.expires_at) > new Date()
+    );
+    return tokens[tokens.length - 1];
+  }
+
+  public consumeVerificationToken(token: string): { success: boolean; error?: string; user?: User } {
+    const vt = this.getVerificationToken(token);
+    if (!vt) {
+      return { success: false, error: 'Tautan verifikasi tidak valid atau tidak ditemukan.' };
+    }
+
+    if (vt.used_at) {
+      return { success: false, error: 'Tautan verifikasi ini sudah pernah digunakan sebelumnya.' };
+    }
+
+    const now = new Date();
+    if (new Date(vt.expires_at) <= now) {
+      return { success: false, error: 'Tautan verifikasi telah kedaluwarsa. Silakan minta tautan baru.' };
+    }
+
+    const user = this.getUserById(vt.user_id);
+    if (!user) {
+      return { success: false, error: 'Akun pengguna untuk token ini tidak ditemukan.' };
+    }
+
+    vt.used_at = now.toISOString();
+    user.is_verified = true;
+    user.verification_status = 'verified';
+    user.updated_at = now.toISOString();
+    this.scheduleSave();
+
+    return { success: true, user };
+  }
+
+  public deleteExpiredVerificationTokens(): number {
+    const now = new Date();
+    const initial = (this.data.verification_tokens || []).length;
+    this.data.verification_tokens = (this.data.verification_tokens || []).filter(
+      vt => new Date(vt.expires_at) > now || !vt.used_at
+    );
+    this.rebuildIndexes();
+    this.scheduleSave();
+    return initial - this.data.verification_tokens.length;
   }
 
   public getUserPreferences(userId: string): UserPreferences | undefined {
@@ -586,6 +686,7 @@ export class RelationalDatabase {
   public getDatabaseStats() {
     return {
       users_count: this.data.users.length,
+      verification_tokens_count: (this.data.verification_tokens || []).length,
       sources_count: this.data.sources.length,
       telegram_channels_count: this.data.telegram_channels.length,
       news_count: this.data.news.length,

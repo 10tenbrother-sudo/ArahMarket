@@ -14,9 +14,13 @@ import {
   X,
   AlertCircle,
   Loader2,
+  QrCode,
+  Building,
 } from 'lucide-react';
 import { User, SubscriptionPlan } from '../types';
 import { api } from '../lib/api';
+import { PLANS, PlanDefinition } from '../lib/plans';
+import { PaymentCheckoutModal } from './PaymentCheckoutModal';
 
 export interface SubscriptionPlansProps {
   user?: User | null;
@@ -48,25 +52,7 @@ interface PricingTier {
 
 const TIERS: PricingTier[] = [
   {
-    id: 'FREE',
-    name: 'Evaluation Tier',
-    tagline: 'Basic Market Surveillance',
-    monthlyPrice: 0,
-    annualPrice: 0,
-    description: 'Real-time market radar and economic calendar for individual traders evaluating terminal intelligence.',
-    accentColor: 'slate',
-    features: [
-      'Real-time Intraday Bias Radar (13 Core Assets)',
-      'G8 Currency Strength Matrix & Heatmap',
-      'Curated Macro News Wire & RSS Ingestion',
-      'Economic Calendar with Consensus & Actuals',
-      'Single Local Watchlist Session',
-      'Public TradingView Chart Popups',
-    ],
-    exclusiveFeatures: [
-      'Standard polling updates (15-30s)',
-      'Community discussion signals',
-    ],
+    ...PLANS.FREE,
     metrics: {
       streamSpeed: 'Standard Polling',
       watchlists: '1 Local Watchlist',
@@ -75,30 +61,7 @@ const TIERS: PricingTier[] = [
     },
   },
   {
-    id: 'PRO',
-    name: 'Trader Pro',
-    badge: 'MOST POPULAR',
-    tagline: 'Full Institutional Macro Engine',
-    monthlyPrice: 49,
-    annualPrice: 39,
-    popular: true,
-    description: 'High-frequency macro intelligence, sub-second streaming, unlimited cloud watchlists, and AI catalyst breakdowns.',
-    accentColor: 'cyan',
-    features: [
-      'Everything in Evaluation Tier',
-      'Sub-second SSE Live Data Priority Stream',
-      'AI-Powered Macro Summaries & Causal Logic',
-      'Today\'s Catalysts Beat/Miss Real-Time Analysis',
-      'Central Bank Speech Hawkish/Dovish Tone Engine',
-      'Unlimited Persistent Cloud Watchlists',
-      'Full Multi-Timeframe TradingView Modals',
-      'Configurable Sound & Visual Price Threshold Alerts',
-    ],
-    exclusiveFeatures: [
-      'Sub-second real-time event alerts',
-      'Automated macro causal impact chains',
-      'Priority WebSocket/SSE connection pool',
-    ],
+    ...PLANS.PRO,
     metrics: {
       streamSpeed: '< 100ms Ultra-Low Latency',
       watchlists: 'Unlimited Cloud Sync',
@@ -107,29 +70,7 @@ const TIERS: PricingTier[] = [
     },
   },
   {
-    id: 'INSTITUTIONAL',
-    name: 'Desk & Institutional',
-    badge: 'DESK & PROP',
-    tagline: 'Multi-Seat Enterprise Telemetry',
-    monthlyPrice: 199,
-    annualPrice: 159,
-    description: 'Enterprise pipeline control, private Telegram feed scraping engine, custom webhooks, and administrative multi-seat authority.',
-    accentColor: 'purple',
-    features: [
-      'Everything in Trader Pro',
-      'Telegram Feed Ingestion Scraper Control Panel',
-      'Custom Source Management & Ingestion Overrides',
-      'Raw Relational Database Inspection & Admin View',
-      'High-Throughput Dedicated Server-Sent Event Gateway',
-      'Institutional SLA & 99.99% Uptime Guarantee',
-      'Direct API Access & Exportable Data Dumps',
-      'Multi-Seat License & Team Admin Controls',
-    ],
-    exclusiveFeatures: [
-      'Full Admin Panel & Channel Scraper access',
-      'Direct pipeline diagnostic telemetry',
-      'Dedicated compliance audit logs',
-    ],
+    ...PLANS.INSTITUTIONAL,
     metrics: {
       streamSpeed: 'Dedicated SLA Gateway',
       watchlists: 'Enterprise Multi-User',
@@ -148,6 +89,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
 }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [updatingPlan, setUpdatingPlan] = useState<SubscriptionPlan | null>(null);
+  const [checkoutTier, setCheckoutTier] = useState<SubscriptionPlan | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
@@ -172,17 +114,24 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       return;
     }
 
+    // Paid plans (PRO, INSTITUTIONAL) open QRIS & Mandiri VA Payment Checkout Modal
+    if (tierId === 'PRO' || tierId === 'INSTITUTIONAL') {
+      setCheckoutTier(tierId);
+      return;
+    }
+
+    // Free tier downgrade
     try {
       setUpdatingPlan(tierId);
       const res = await api.updateSubscription(tierId);
       if (res.success && res.user) {
-        setSuccessMessage(`Successfully updated your subscription to ${tierId === 'FREE' ? 'Free Evaluation' : tierId === 'PRO' ? 'Trader Pro' : 'Desk & Institutional'}!`);
+        setSuccessMessage('Berhasil beralih ke paket Free Evaluation.');
         if (onPlanUpdated) {
           onPlanUpdated(res.user);
         }
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to update plan. Please try again.');
+      setErrorMessage(err.message || 'Gagal mengubah paket. Silakan coba lagi.');
     } finally {
       setUpdatingPlan(null);
     }
@@ -343,18 +292,38 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                   {tier.name}
                 </div>
 
-                {/* Price Display */}
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-slate-100 font-sans tracking-tight">
-                    ${displayPrice}
-                  </span>
-                  <span className="text-xs text-slate-400">
-                    {tier.monthlyPrice === 0
-                      ? '/ forever'
-                      : billingCycle === 'annual'
-                      ? '/ month (billed annually)'
-                      : '/ month'}
-                  </span>
+                {/* Price Display with IDR and USD */}
+                <div className="mt-4">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl font-extrabold text-slate-100 font-sans tracking-tight">
+                      {tier.id === 'FREE'
+                        ? 'Rp 0'
+                        : tier.id === 'PRO'
+                        ? billingCycle === 'annual'
+                          ? 'Rp 399.000'
+                          : 'Rp 499.000'
+                        : billingCycle === 'annual'
+                        ? 'Rp 1.590.000'
+                        : 'Rp 1.999.000'}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {tier.monthlyPrice === 0
+                        ? '/ selamanya'
+                        : billingCycle === 'annual'
+                        ? '/ bln (tahunan)'
+                        : '/ bln'}
+                    </span>
+                  </div>
+                  {tier.monthlyPrice > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        ≈ ${displayPrice} USD {billingCycle === 'annual' ? `(${(displayPrice * 12)}/thn)` : ''}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-mono">
+                        <QrCode className="w-2.5 h-2.5" /> QRIS & Mandiri VA
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-xs text-slate-300 font-sans mt-3 leading-relaxed min-h-[38px]">
@@ -562,6 +531,23 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Midtrans & Mandiri Payment Modal */}
+      {checkoutTier && user && (
+        <PaymentCheckoutModal
+          user={user}
+          plan={checkoutTier}
+          billingCycle={billingCycle}
+          onClose={() => setCheckoutTier(null)}
+          onSuccess={(updatedUser) => {
+            setCheckoutTier(null);
+            setSuccessMessage(`Pembayaran berhasil! Akun Anda telah di-upgrade ke ${checkoutTier === 'PRO' ? 'Trader Pro' : 'Desk & Institutional'}.`);
+            if (onPlanUpdated) {
+              onPlanUpdated(updatedUser);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

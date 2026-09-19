@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db/database.js';
 import { analyzeMarketEventWithGemini } from '../intelligence/gemini.js';
+import { requireAuth, AuthenticatedRequest } from '../auth/authService.js';
+import { EntitlementService } from '../auth/entitlementService.js';
 
 export const eventRouter = Router();
 
@@ -64,8 +66,31 @@ eventRouter.get('/:id', async (req, res) => {
   });
 });
 
-// POST trigger re-analysis of single event with Gemini
-eventRouter.post('/:id/analyze', async (req, res) => {
+// POST trigger re-analysis of single event with Gemini (Requires auth, AI_DEEP_ANALYSIS permission, and usage check)
+eventRouter.post('/:id/analyze', requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  
+  if (!EntitlementService.canAccessFeature(user, 'AI_DEEP_ANALYSIS')) {
+    res.status(403).json({
+      error: 'Upgrade Required: Deep event re-analysis with causal reasoning is available on PRO and INSTITUTIONAL tiers.',
+      code: 'PLAN_UPGRADE_REQUIRED',
+      required_permission: 'AI_DEEP_ANALYSIS',
+      current_plan: user.plan || 'FREE',
+    });
+    return;
+  }
+
+  const usageCheck = EntitlementService.checkAndIncrementAIUsage(user.id, user);
+  if (!usageCheck.allowed) {
+    res.status(429).json({
+      error: `Daily limit reached: Your ${user.plan || 'FREE'} plan allows ${usageCheck.limit} AI operations per day.`,
+      code: 'USAGE_LIMIT_REACHED',
+      limit: usageCheck.limit,
+      used: usageCheck.used,
+    });
+    return;
+  }
+
   const eventId = req.params.id;
   const event = db.getEventById(eventId);
   if (!event) {
@@ -75,7 +100,15 @@ eventRouter.post('/:id/analyze', async (req, res) => {
 
   try {
     const analysis = await analyzeMarketEventWithGemini(event);
-    res.json({ success: true, analysis });
+    res.json({
+      success: true,
+      analysis,
+      usage: {
+        used: usageCheck.used,
+        limit: usageCheck.limit,
+        remaining: usageCheck.remaining,
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -33,16 +33,20 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery = '',
   onSearchChange,
 }) => {
-  const [utcTime, setUtcTime] = useState<string>('');
+  const [wibTime, setWibTime] = useState<string>('');
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      // Format as compact "HH:MM:SS UTC"
-      const hours = String(now.getUTCHours()).padStart(2, '0');
-      const minutes = String(now.getUTCMinutes()).padStart(2, '0');
-      const seconds = String(now.getUTCSeconds()).padStart(2, '0');
-      setUtcTime(`${hours}:${minutes}:${seconds} UTC`);
+      // Format as Jakarta / WIB time: HH:mm:ss WIB
+      const timeStr = now.toLocaleTimeString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      setWibTime(`${timeStr} WIB`);
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
@@ -71,8 +75,6 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Watchlist';
       case 'admin':
         return 'System & Feeds';
-      case 'plans':
-        return 'Subscription & Pricing';
       default:
         return tab;
     }
@@ -162,10 +164,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* Clean UTC Live Time */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 tabular-nums">
-            <Clock className="w-3 h-3 text-slate-400" />
-            <span>{utcTime || 'UTC'}</span>
+          {/* Clean WIB Live Time */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 tabular-nums" title="Waktu Indonesia Barat (Jakarta UTC+7)">
+            <Clock className="w-3 h-3 text-cyan-400" />
+            <span>{wibTime || 'WIB'}</span>
           </div>
 
           {/* Global Ingestion Sync Trigger */}

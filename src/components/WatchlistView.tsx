@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserWatchlist, MarketPrice, User } from '../types';
-import { Star, Trash2, Plus, TrendingUp, TrendingDown, Minus, LogIn, ShieldAlert } from 'lucide-react';
+import { Star, Trash2, Plus, TrendingUp, TrendingDown, Minus, LogIn, ShieldAlert, ArrowUpRight } from 'lucide-react';
+import { getUserLimits } from '../lib/plans';
 
 interface WatchlistViewProps {
   watchlist: UserWatchlist[];
@@ -24,9 +25,15 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
   const [newSymbol, setNewSymbol] = useState('');
   const [newType, setNewType] = useState('ASSET');
 
+  const limits = getUserLimits(user as any);
+  const isAtLimit = watchlist.length >= limits.watchlistLimit;
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSymbol) return;
+    if (isAtLimit) {
+      return;
+    }
     onAdd(newSymbol.toUpperCase().trim(), newType);
     setNewSymbol('');
   };
@@ -40,8 +47,13 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
           <div className="flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             <h2 className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
-              TRADER PERSONAL WATCHLIST ({watchlist.length})
+              TRADER PERSONAL WATCHLIST ({watchlist.length}/{limits.watchlistLimit})
             </h2>
+            {isAtLimit && (
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                PLAN QUOTA REACHED
+              </span>
+            )}
           </div>
           <p className="text-[10px] font-mono text-slate-500 mt-0.5">
             Private tracking list with real-time price updates & correlation monitoring

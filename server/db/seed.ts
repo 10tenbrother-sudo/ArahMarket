@@ -16,7 +16,7 @@ import {
 
 export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
   const s = salt || crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, s, 1000, 64, 'sha512').toString('hex');
+  const hash = crypto.pbkdf2Sync(password, s, 210_000, 64, 'sha512').toString('hex');
   return { hash, salt: s };
 }
 

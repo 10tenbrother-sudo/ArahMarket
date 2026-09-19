@@ -115,7 +115,7 @@ export const TradingViewChartModal: React.FC<TradingViewChartModalProps> = ({
   // Build iframe embed URL for real-time non-delayed TradingView chart
   const tvWidgetUrl = `https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
     selectedMeta.tvSymbol
-  )}&interval=${interval}&theme=dark&style=1&timezone=Etc%2FUTC&locale=en&hide_side_toolbar=0&allow_symbol_change=1&saveimage=1&details=1&calendar=1&hotlist=0`;
+  )}&interval=${interval}&theme=dark&style=1&timezone=Asia%2FJakarta&locale=id&hide_side_toolbar=0&allow_symbol_change=1&saveimage=1&details=1&calendar=1&hotlist=0`;
 
   const snapshotId = selectedMeta.snapshotUrl ? selectedMeta.snapshotUrl.split('/x/')[1]?.replace('/', '') : null;
   const snapshotImageUrl = snapshotId ? `https://s3.tradingview.com/snapshots/${snapshotId[0].toLowerCase()}/${snapshotId}.png` : null;

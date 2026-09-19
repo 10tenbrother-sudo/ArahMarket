@@ -19,28 +19,22 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { User } from '../types';
-import { SubscriptionPlans } from './SubscriptionPlans';
 
 interface PublicLandingPageProps {
   currentPath: string;
   onNavigate: (to: string) => void;
   user?: User | null;
-  onPlanUpdated?: (u: User) => void;
 }
 
 export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   currentPath,
   onNavigate,
   user,
-  onPlanUpdated,
 }) => {
-  // Auto-scroll to specific section when path is /features or /pricing
+  // Auto-scroll to specific section when path is /features
   useEffect(() => {
     if (currentPath === '/features') {
       const el = document.getElementById('features-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    } else if (currentPath === '/pricing') {
-      const el = document.getElementById('pricing-section');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -90,16 +84,6 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               className="px-3 py-1.5 rounded-md text-slate-400 hover:text-slate-200 transition cursor-pointer"
             >
               Supported Markets
-            </button>
-            <button
-              onClick={() => onNavigate('/pricing')}
-              className={`px-3 py-1.5 rounded-md transition cursor-pointer ${
-                currentPath === '/pricing'
-                  ? 'text-cyan-400 bg-slate-900 border border-slate-800'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Pricing
             </button>
           </nav>
         </div>
@@ -500,15 +484,6 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing-section" className="py-16 px-4 sm:px-8 border-t border-slate-900 bg-slate-950/70">
-        <SubscriptionPlans
-          user={user}
-          onPlanUpdated={onPlanUpdated}
-          onOpenAuth={() => onNavigate('/login')}
-        />
-      </section>
-
       {/* Footer */}
       <footer className="mt-auto border-t border-slate-900 bg-slate-950 px-4 sm:px-8 py-8 text-slate-400 text-xs font-mono">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -526,9 +501,6 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </button>
             <button onClick={() => onNavigate('/features')} className="hover:text-slate-200 transition cursor-pointer">
               Features
-            </button>
-            <button onClick={() => onNavigate('/pricing')} className="hover:text-slate-200 transition cursor-pointer">
-              Pricing
             </button>
             <button onClick={() => onNavigate('/login')} className="hover:text-cyan-400 transition cursor-pointer">
               Sign In

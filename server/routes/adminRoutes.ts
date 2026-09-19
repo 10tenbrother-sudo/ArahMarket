@@ -7,8 +7,12 @@ import { CurrencyStrengthService } from '../ingestion/currencyStrength.js';
 import { MacroDataService } from '../ingestion/macroData.js';
 import { processNewsThroughPipeline } from '../ingestion/pipeline.js';
 import { sseBroker } from '../realtime/sse.js';
+import { requireAdmin, AuthenticatedRequest } from '../auth/authService.js';
 
 export const adminRouter = Router();
+
+// Enforce ADMIN role authentication across all admin endpoints
+adminRouter.use(requireAdmin as any);
 
 // 1. GET System Health & Database Metrics
 adminRouter.get('/system-health', (req, res) => {
@@ -242,3 +246,59 @@ adminRouter.post('/ingest/run-all', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// 7. User & Subscription Management (Admin Only)
+adminRouter.get('/users', (req: Request, res: Response) => {
+  const users = db.getAllUsers().map(u => ({
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    is_verified: u.is_verified,
+    plan: u.plan || 'FREE',
+    subscription_status: u.subscription_status || 'active',
+    subscription_expires_at: u.subscription_expires_at,
+    created_at: u.created_at,
+    updated_at: u.updated_at,
+  }));
+  res.json({ users, count: users.length });
+});
+
+adminRouter.patch('/users/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { role, plan, subscription_status } = req.body;
+
+  const target = db.getUserById(id);
+  if (!target) {
+    res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+
+  const updates: any = {};
+  if (role && ['USER', 'ADMIN'].includes(role)) {
+    updates.role = role;
+  }
+  if (plan && ['FREE', 'PRO', 'INSTITUTIONAL'].includes(plan)) {
+    updates.plan = plan;
+  }
+  if (subscription_status && ['active', 'trialing', 'canceled', 'expired'].includes(subscription_status)) {
+    updates.subscription_status = subscription_status;
+  }
+
+  const updated = db.updateUser(id, updates);
+  res.json({
+    success: true,
+    user: {
+      id: updated?.id,
+      email: updated?.email,
+      name: updated?.name,
+      role: updated?.role,
+      is_verified: updated?.is_verified,
+      plan: updated?.plan,
+      subscription_status: updated?.subscription_status,
+      created_at: updated?.created_at,
+      updated_at: updated?.updated_at,
+    },
+  });
+});
+

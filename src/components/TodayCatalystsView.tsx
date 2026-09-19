@@ -218,7 +218,14 @@ export const TodayCatalystsView: React.FC<TodayCatalystsViewProps> = ({
                       </h3>
                       <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
                         <Clock className="w-3 h-3 text-slate-500" />
-                        <span>{new Date(item.date_time_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC</span>
+                        <span>
+                          {new Date(item.date_time_utc).toLocaleTimeString('id-ID', {
+                            timeZone: 'Asia/Jakarta',
+                            hour12: false,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })} WIB
+                        </span>
                         <span>•</span>
                         <span className="text-cyan-400 font-semibold">{formatCountdown(item.date_time_utc)}</span>
                       </div>
@@ -308,7 +315,17 @@ export const TodayCatalystsView: React.FC<TodayCatalystsViewProps> = ({
                       </p>
                       <div className="text-[10px] font-mono text-slate-500 pt-1 flex items-center justify-between">
                         <span>Source: {item.source}</span>
-                        <span>Updated: {new Date(item.last_updated).toLocaleTimeString()} UTC</span>
+                        <span>
+                          Updated:{' '}
+                          {new Date(item.last_updated).toLocaleTimeString('id-ID', {
+                            timeZone: 'Asia/Jakarta',
+                            hour12: false,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}{' '}
+                          WIB
+                        </span>
                       </div>
                     </div>
                   )}

@@ -24,12 +24,10 @@ import { MacroCalendarView } from './components/MacroCalendarView';
 import { AIIntelligenceView } from './components/AIIntelligenceView';
 import { AdminPanel } from './components/AdminPanel';
 import { WatchlistView } from './components/WatchlistView';
-import { AuthModal } from './components/AuthModal';
 import { TradingViewChartModal } from './components/TradingViewChartModal';
 import { IntradayMarketMapView } from './components/IntradayMarketMapView';
 import { TodayCatalystsView } from './components/TodayCatalystsView';
 import { CurrencyPairOpportunityMatrix } from './components/CurrencyPairOpportunityMatrix';
-import { SubscriptionPlans } from './components/SubscriptionPlans';
 import { PublicLandingPage } from './components/PublicLandingPage';
 import { AuthPage } from './components/AuthPage';
 import {
@@ -54,6 +52,7 @@ import {
   Zap,
   ArrowRight,
   ShieldCheck,
+  ShieldAlert,
   ChevronRight,
   Activity,
   BarChart2,
@@ -71,7 +70,6 @@ export default function App() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [chartModalSymbol, setChartModalSymbol] = useState<string | null>(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   // Core Data Collections (Single Source of Truth)
   const [prices, setPrices] = useState<MarketPrice[]>([]);
@@ -268,6 +266,19 @@ export default function App() {
     navigate('/login');
   };
 
+  const handleAuthSuccess = useCallback(async (u: User) => {
+    setUser(u);
+    try {
+      const me = await api.getMe();
+      setUser(me.user);
+      setWatchlist(me.watchlist || []);
+    } catch (err) {
+      console.warn('Profile hydration notice:', err);
+    }
+    loadInitialData();
+    navigate('/dashboard', true);
+  }, [loadInitialData, navigate]);
+
   // Filtered Events for Wire
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
@@ -317,11 +328,7 @@ export default function App() {
         <AuthPage
           mode="login"
           onNavigate={navigate}
-          onSuccess={(u) => {
-            setUser(u);
-            loadInitialData();
-            navigate('/dashboard');
-          }}
+          onSuccess={(u) => handleAuthSuccess(u)}
         />
       );
     }
@@ -331,22 +338,32 @@ export default function App() {
         <AuthPage
           mode="register"
           onNavigate={navigate}
-          onSuccess={(u) => {
-            setUser(u);
-            loadInitialData();
-            navigate('/dashboard');
-          }}
+          onSuccess={(u) => handleAuthSuccess(u)}
         />
       );
     }
 
-    // Default Public View for '/', '/features', '/pricing'
+    if (path === '/verify-email') {
+      return (
+        <AuthPage
+          mode="verify-email"
+          onNavigate={navigate}
+          onSuccess={(u) => handleAuthSuccess(u)}
+        />
+      );
+    }
+
+    if (path === '/pricing') {
+      navigate('/');
+      return null;
+    }
+
+    // Default Public View for '/', '/features'
     return (
       <PublicLandingPage
         currentPath={path}
         onNavigate={navigate}
         user={user}
-        onPlanUpdated={(updatedUser) => setUser(updatedUser)}
       />
     );
   }
@@ -713,7 +730,15 @@ export default function App() {
                           <span className="text-slate-200 truncate max-w-xs">{item.event_name}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-slate-400 text-[11px]">{new Date(item.date_time_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC</span>
+                          <span className="text-slate-400 text-[11px]">
+                            {new Date(item.date_time_utc).toLocaleTimeString('id-ID', {
+                              timeZone: 'Asia/Jakarta',
+                              hour12: false,
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}{' '}
+                            WIB
+                          </span>
                           <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
                             item.impact === 'CRITICAL' ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-slate-800 text-slate-400'
                           }`}>
@@ -905,7 +930,10 @@ export default function App() {
 
           {/* VIEW 8: AI INTELLIGENCE */}
           {activeTab === 'intelligence' && (
-            <AIIntelligenceView initialOverview={overview} />
+            <AIIntelligenceView
+              initialOverview={overview}
+              user={user}
+            />
           )}
 
           {/* VIEW 9: WATCHLIST */}
@@ -914,14 +942,18 @@ export default function App() {
               watchlist={watchlist}
               prices={prices}
               user={user}
-              onOpenAuth={() => setIsAuthOpen(true)}
+              onOpenAuth={() => navigate('/login')}
               onRemove={async (symbol) => {
                 await api.removeFromWatchlist(symbol);
                 setWatchlist(prev => prev.filter(w => w.symbol !== symbol));
               }}
               onAdd={async (symbol, assetType) => {
-                const res = await api.addToWatchlist(symbol, assetType);
-                if (res.item) setWatchlist(prev => [...prev, res.item]);
+                try {
+                  const res = await api.addToWatchlist(symbol, assetType);
+                  if (res.item) setWatchlist(prev => [...prev, res.item]);
+                } catch (err: any) {
+                  alert(err.message || 'Failed to add to watchlist');
+                }
               }}
               onSelectSymbol={(sym) => {
                 setSelectedSymbol(sym);
@@ -932,16 +964,27 @@ export default function App() {
 
           {/* VIEW 10: ADMIN PANEL */}
           {activeTab === 'admin' && (
-            <AdminPanel />
-          )}
-
-          {/* VIEW 11: SUBSCRIPTION PLANS */}
-          {activeTab === 'plans' && (
-            <SubscriptionPlans
-              user={user}
-              onPlanUpdated={(updatedUser) => setUser(updatedUser)}
-              onOpenAuth={() => setIsAuthOpen(true)}
-            />
+            user?.role === 'ADMIN' ? (
+              <AdminPanel />
+            ) : (
+              <div className="max-w-md mx-auto my-12 p-6 rounded-xl bg-slate-900 border border-slate-800 text-center font-mono">
+                <div className="w-12 h-12 mx-auto rounded-full bg-red-950/80 border border-red-500/40 flex items-center justify-center text-red-400 mb-4">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <h2 className="text-base font-bold text-slate-100 uppercase tracking-wider">Access Restricted</h2>
+                <p className="text-xs text-slate-400 mt-2">
+                  Administrative Telemetry & Feed Orchestration is restricted to system administrators with verified authority.
+                </p>
+                <div className="mt-6 flex justify-center gap-3">
+                  <button
+                    onClick={() => handleTabChange('terminal')}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition cursor-pointer"
+                  >
+                    Return to Terminal
+                  </button>
+                </div>
+              </div>
+            )
           )}
         </main>
       </div>
@@ -954,18 +997,7 @@ export default function App() {
         />
       )}
 
-      {/* 5. Authentication Modal */}
-      {isAuthOpen && (
-        <AuthModal
-          onClose={() => setIsAuthOpen(false)}
-          onSuccess={(u) => {
-            setUser(u);
-            api.getWatchlist().then(w => setWatchlist(w.watchlist || []));
-          }}
-        />
-      )}
-
-      {/* 6. TradingView Interactive Candlestick Chart Modal */}
+      {/* 5. TradingView Interactive Candlestick Chart Modal */}
       {chartModalSymbol && (
         <TradingViewChartModal
           initialSymbol={chartModalSymbol}

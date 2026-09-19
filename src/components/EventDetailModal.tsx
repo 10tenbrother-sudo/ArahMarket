@@ -33,6 +33,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
   const [loading, setLoading] = useState(true);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   const fetchDetail = async () => {
     try {
@@ -54,15 +55,17 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
   const handleReanalyze = async () => {
     try {
       setReanalyzing(true);
+      setNotice(null);
       const res = await api.reanalyzeEvent(eventId);
       if (res.analysis && data) {
         setData({
           ...data,
           ai_analysis: res.analysis,
         });
+        setNotice({ type: 'success', message: 'Event causal chain and market impact re-analyzed.' });
       }
     } catch (err: any) {
-      alert(`AI re-analysis failed: ${err.message}`);
+      setNotice({ type: 'error', message: err.message || 'AI re-analysis failed' });
     } finally {
       setReanalyzing(false);
     }
@@ -135,6 +138,27 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
 
         {/* Modal Scrollable Body */}
         <div className="overflow-y-auto p-5 space-y-6">
+          {notice && (
+            <div className={`p-3 rounded-lg border text-xs font-mono flex items-center justify-between gap-2 ${
+              notice.type === 'error'
+                ? 'bg-rose-950/60 border-rose-800/80 text-rose-300'
+                : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{notice.message}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setNotice(null)}
+                  className="text-slate-400 hover:text-slate-200 text-xs cursor-pointer ml-1"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 1. Event Core Summary */}
           <div>
             <div className="flex items-center gap-2 mb-2">
