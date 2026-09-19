@@ -59,3 +59,39 @@ userRouter.get('/preferences', requireAuth, (req: AuthenticatedRequest, res: Res
   const prefs = db.getUserPreferences(userId);
   res.json({ preferences: prefs });
 });
+
+// POST update user subscription plan
+userRouter.post('/subscription', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const { plan } = req.body;
+  if (!['FREE', 'PRO', 'INSTITUTIONAL'].includes(plan)) {
+    res.status(400).json({ error: 'Invalid plan selected. Must be FREE, PRO, or INSTITUTIONAL.' });
+    return;
+  }
+
+  const updated = db.updateUser(userId, {
+    plan,
+    subscription_status: 'active',
+  });
+
+  if (!updated) {
+    res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    user: {
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      role: updated.role,
+      is_verified: updated.is_verified,
+      avatar_url: updated.avatar_url,
+      plan: updated.plan,
+      subscription_status: updated.subscription_status,
+      subscription_expires_at: updated.subscription_expires_at,
+    },
+  });
+});
+

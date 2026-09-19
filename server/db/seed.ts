@@ -34,6 +34,8 @@ export function seedDatabase(): void {
       name: 'Chief Market Officer',
       role: 'ADMIN',
       is_verified: true,
+      plan: 'INSTITUTIONAL',
+      subscription_status: 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -48,6 +50,8 @@ export function seedDatabase(): void {
       name: 'Pro Trader',
       role: 'USER',
       is_verified: true,
+      plan: 'PRO',
+      subscription_status: 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

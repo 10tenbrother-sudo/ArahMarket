@@ -30,7 +30,8 @@ export type NavTabId =
   | 'events'
   | 'intelligence'
   | 'watchlist'
-  | 'admin';
+  | 'admin'
+  | 'plans';
 
 interface SidebarProps {
   activeTab: NavTabId;
@@ -144,6 +145,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           shortLabel: 'Watchlist',
           icon: Star,
           badge: null,
+        },
+        {
+          id: 'plans' as NavTabId,
+          label: 'Subscription Plans',
+          shortLabel: 'Plans',
+          icon: Zap,
+          badge: user?.plan || 'PRO',
+          badgeColor: user?.plan === 'INSTITUTIONAL'
+            ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+            : user?.plan === 'PRO'
+            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+            : 'bg-slate-800 text-slate-300 border-slate-700',
         },
         {
           id: 'admin' as NavTabId,
@@ -307,8 +320,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="text-xs font-bold text-slate-100 truncate leading-tight font-sans">
                         {user.name}
                       </div>
-                      <div className="text-[9px] text-cyan-400 font-mono leading-tight">
-                        {user.role || 'TRADER'}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[9px] text-cyan-400 font-mono leading-tight">
+                          {user.role || 'TRADER'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSelect('plans')}
+                          className={`text-[8px] font-mono font-bold px-1 rounded border cursor-pointer transition ${
+                            user.plan === 'INSTITUTIONAL'
+                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30'
+                              : user.plan === 'PRO'
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30'
+                              : 'bg-slate-850 text-slate-300 border-slate-700 hover:bg-slate-800'
+                          }`}
+                          title="View / Change Subscription Plan"
+                        >
+                          {user.plan || 'FREE'}
+                        </button>
                       </div>
                     </div>
                   </div>

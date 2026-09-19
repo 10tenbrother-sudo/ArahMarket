@@ -244,12 +244,18 @@ export interface TelegramChannel {
   error_count: number;
 }
 
+export type SubscriptionPlan = 'FREE' | 'PRO' | 'INSTITUTIONAL';
+
 export interface User {
   id: string;
   email: string;
   name: string;
   role: 'USER' | 'ADMIN';
   is_verified: boolean;
+  avatar_url?: string;
+  plan?: SubscriptionPlan;
+  subscription_status?: 'active' | 'trialing' | 'canceled' | 'none';
+  subscription_expires_at?: string;
 }
 
 export interface UserWatchlist {

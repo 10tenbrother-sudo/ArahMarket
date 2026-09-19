@@ -18,15 +18,21 @@ import {
   Sparkles,
   DollarSign,
 } from 'lucide-react';
+import { User } from '../types';
+import { SubscriptionPlans } from './SubscriptionPlans';
 
 interface PublicLandingPageProps {
   currentPath: string;
   onNavigate: (to: string) => void;
+  user?: User | null;
+  onPlanUpdated?: (u: User) => void;
 }
 
 export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   currentPath,
   onNavigate,
+  user,
+  onPlanUpdated,
 }) => {
   // Auto-scroll to specific section when path is /features or /pricing
   useEffect(() => {
@@ -496,132 +502,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
       {/* Pricing Section */}
       <section id="pricing-section" className="py-16 px-4 sm:px-8 border-t border-slate-900 bg-slate-950/70">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <div className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider mb-2">
-              TRANSPARENT INSTITUTIONAL PLANS
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100 tracking-tight">
-              Select Your Access Tier
-            </h2>
-            <p className="text-sm text-slate-400 mt-2 font-sans">
-              Immediate access to the live surveillance engine with zero hidden lock-ins.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto font-mono">
-            {/* Free Tier */}
-            <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <div className="text-xs text-slate-400 uppercase tracking-wider">Evaluation Tier</div>
-                <div className="text-2xl font-bold text-slate-100 mt-1 font-sans">Free Access</div>
-                <div className="text-xs text-slate-400 mt-0.5">$0 / month</div>
-                <p className="text-xs text-slate-300 font-sans mt-4 leading-relaxed">
-                  Basic market surveillance and live wire for individual traders testing terminal signals.
-                </p>
-                <div className="mt-6 space-y-2.5 text-xs text-slate-300 font-sans">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Real-time Intraday Bias Radar</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>G8 Currency Strength Matrix</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Public Financial News Wire</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('/register')}
-                className="mt-8 w-full py-2.5 rounded-lg border border-slate-700 hover:border-slate-600 bg-slate-850 text-slate-200 text-xs font-bold transition cursor-pointer"
-              >
-                Create Free Account
-              </button>
-            </div>
-
-            {/* Pro Tier (Featured) */}
-            <div className="p-6 rounded-xl bg-slate-900 border-2 border-cyan-500 shadow-xl shadow-cyan-500/10 flex flex-col justify-between relative">
-              <div className="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 font-bold text-[10px] tracking-wider uppercase">
-                MOST POPULAR
-              </div>
-              <div>
-                <div className="text-xs text-cyan-400 uppercase tracking-wider font-bold">Trader Pro</div>
-                <div className="text-2xl font-bold text-slate-100 mt-1 font-sans">$49</div>
-                <div className="text-xs text-slate-400 mt-0.5">billed monthly</div>
-                <p className="text-xs text-slate-300 font-sans mt-4 leading-relaxed">
-                  Full institutional macroeconomic engine, unlimited cloud watchlists, and AI catalyst breakdown.
-                </p>
-                <div className="mt-6 space-y-2.5 text-xs text-slate-300 font-sans">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span>Everything in Free</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span>Sub-second SSE stream priority</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span>AI-Generated Macro Overview Reports</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span>Persistent Cloud Watchlist Sync</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span>TradingView Advanced Charting</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('/register')}
-                className="mt-8 w-full py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition shadow-md shadow-cyan-500/20 cursor-pointer"
-              >
-                Get Started Pro
-              </button>
-            </div>
-
-            {/* Institutional Tier */}
-            <div className="p-6 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <div className="text-xs text-slate-400 uppercase tracking-wider">Desk & Prop</div>
-                <div className="text-2xl font-bold text-slate-100 mt-1 font-sans">$199</div>
-                <div className="text-xs text-slate-400 mt-0.5">per seat / month</div>
-                <p className="text-xs text-slate-300 font-sans mt-4 leading-relaxed">
-                  Dedicated high-throughput channels, Telegram feed ingestion control, and multi-user administration.
-                </p>
-                <div className="mt-6 space-y-2.5 text-xs text-slate-300 font-sans">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span>Everything in Pro</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span>Telegram Scraper Control Panel</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span>Custom News Source Ingestion</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span>Dedicated SLA & High Priority Bandwidth</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('/register')}
-                className="mt-8 w-full py-2.5 rounded-lg border border-slate-700 hover:border-slate-600 bg-slate-850 text-slate-200 text-xs font-bold transition cursor-pointer"
-              >
-                Contact Institutional Sales
-              </button>
-            </div>
-          </div>
-        </div>
+        <SubscriptionPlans
+          user={user}
+          onPlanUpdated={onPlanUpdated}
+          onOpenAuth={() => onNavigate('/login')}
+        />
       </section>
 
       {/* Footer */}

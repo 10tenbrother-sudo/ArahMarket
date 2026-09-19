@@ -71,6 +71,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Watchlist';
       case 'admin':
         return 'System & Feeds';
+      case 'plans':
+        return 'Subscription & Pricing';
       default:
         return tab;
     }

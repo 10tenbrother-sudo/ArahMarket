@@ -13,6 +13,7 @@ import {
   UnifiedMarketContext,
   IntradayAssetBias,
   TodayCatalyst,
+  SubscriptionPlan,
 } from '../types';
 
 export const API_BASE = '/api';
@@ -110,6 +111,10 @@ export const api = {
   }),
   removeFromWatchlist: (symbol: string) => request<{ success: boolean; symbol: string }>(`/user/watchlist/${symbol}`, {
     method: 'DELETE',
+  }),
+  updateSubscription: (plan: SubscriptionPlan) => request<{ success: boolean; user: User }>('/user/subscription', {
+    method: 'POST',
+    body: JSON.stringify({ plan }),
   }),
 
   // Admin

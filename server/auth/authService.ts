@@ -111,6 +111,8 @@ export class AuthService {
       name: name.trim() || 'Trader',
       role: 'USER',
       is_verified: true, // Auto-verified for seamless UX
+      plan: 'FREE',
+      subscription_status: 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

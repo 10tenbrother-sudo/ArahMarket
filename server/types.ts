@@ -3,6 +3,7 @@
  */
 
 export type UserRole = 'USER' | 'ADMIN';
+export type SubscriptionPlan = 'FREE' | 'PRO' | 'INSTITUTIONAL';
 
 export interface User {
   id: string;
@@ -13,6 +14,9 @@ export interface User {
   role: UserRole;
   is_verified: boolean;
   avatar_url?: string;
+  plan?: SubscriptionPlan;
+  subscription_status?: 'active' | 'trialing' | 'canceled' | 'none';
+  subscription_expires_at?: string;
   created_at: string;
   updated_at: string;
 }

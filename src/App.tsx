@@ -29,6 +29,7 @@ import { TradingViewChartModal } from './components/TradingViewChartModal';
 import { IntradayMarketMapView } from './components/IntradayMarketMapView';
 import { TodayCatalystsView } from './components/TodayCatalystsView';
 import { CurrencyPairOpportunityMatrix } from './components/CurrencyPairOpportunityMatrix';
+import { SubscriptionPlans } from './components/SubscriptionPlans';
 import { PublicLandingPage } from './components/PublicLandingPage';
 import { AuthPage } from './components/AuthPage';
 import {
@@ -344,6 +345,8 @@ export default function App() {
       <PublicLandingPage
         currentPath={path}
         onNavigate={navigate}
+        user={user}
+        onPlanUpdated={(updatedUser) => setUser(updatedUser)}
       />
     );
   }
@@ -930,6 +933,15 @@ export default function App() {
           {/* VIEW 10: ADMIN PANEL */}
           {activeTab === 'admin' && (
             <AdminPanel />
+          )}
+
+          {/* VIEW 11: SUBSCRIPTION PLANS */}
+          {activeTab === 'plans' && (
+            <SubscriptionPlans
+              user={user}
+              onPlanUpdated={(updatedUser) => setUser(updatedUser)}
+              onOpenAuth={() => setIsAuthOpen(true)}
+            />
           )}
         </main>
       </div>
